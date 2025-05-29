@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eFeeder Monitoring</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f66, #fdbb2d);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        header h1 {
+            font-size: 2.5em;
+            color: #ffd700;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .widget {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s;
+        }
+        .widget:hover {
+            transform: translateY(-5px);
+        }
+        .widget-label {
+            font-size: 1.2em;
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+        .widget-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        .widget-unit {
+            font-size: 0.9em;
+            color: #ccc;
+        }
+        .control-panel {
+            grid-column: 1 / -1;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+        .control-panel button {
+            background: #ffd700;
+            color: #1a2a6c;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1.1em;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .control-panel button:hover {
+            background: #ffea00;
+            transform: scale(1.05);
+        }
+        .control-panel button:active {
+            transform: scale(0.95);
+        }
+        .log-box {
+            grid-column: 1 / -1;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            text-align: left;
+        }
+        .log-box .log-item {
+            margin: 5px 0;
+            color: #fff;
+        }
+        .warning {
+            color: #ff4444;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0.5; }
+        }
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; }
+            .control-panel, .log-box { grid-column: auto; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><i class="fas fa-fish"></i> eFeeder Monitoring</h1>
+    </header>
+    <div class="container">
+        <div class="widget">
+            <div class="widget-label">Waktu</div>
+            <div class="widget-value" id="timeValue">N/A</div>
+        </div>
+        <div class="widget">
+            <div class="widget-label">Servo</div>
+            <div class="widget-value" id="servoValue">N/A</div>
+        </div>
+        <div class="widget">
+            <div class="widget-label">Relay</div>
+            <div class="widget-value" id="relayValue">N/A</div>
+        </div>
+        <div class="widget">
+    <div class="widget-label">Jumlah Pakan</div>
+    <div class="widget-value" id="distanceValue">N/A</div>
+    <div class="widget-unit">   </div>
+    <div class="widget-label" id="stockStatus">Status: <span id="stockText">N/A</span></div>
+</div>
+        <div class="widget">
+            <div class="widget-label">Jadwal Pakan</div>
+            <div>
+                <div>07:00 - <span id="fed0Value">Belum diberikan</span></div>
+                <div>12:00 - <span id="fed1Value">Belum diberikan</span></div>
+                <div>14:00 - <span id="fed2Value">Belum diberikan</span></div>
+                <div>15:30 - <span id="fed3Value">Belum diberikan</span></div>
+                <div>17:00 - <span id="fed4Value">Belum diberikan</span></div>
+            </div>
+        </div>
+        <div class="control-panel">
+            <button id="feedButton">Berikan Pakan</button>
+        </div>
+        <div class="log-box">
+            <div id="logValue" class="log-item">Belum ada log...</div>
+        </div>  
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://unpkg.com/mqtt@5.0.0/dist/mqtt.min.js"></script>
+    <script>
+        const client = mqtt.connect('wss://cd635dbefa6440a2bcd152010f0841b3.s1.eu.hivemq.cloud:8884/mqtt', {
+            username: 'gee2k_',
+            password: '@Glenpemain04'
+        });
+
+        let latestData = {
+            time: "N/A",
+            servo: "N/A",
+            relay: "N/A",
+            distance: "N/A",
+            fed: [false, false, false, false, false],
+            log: "Belum ada log..."
+        };
+
+        client.on('connect', function() {
+            console.log('Terhubung ke broker MQTT');
+            client.subscribe('/efeeder/time');
+            client.subscribe('/efeeder/servo');
+            client.subscribe('/efeeder/relay');
+            client.subscribe('/efeeder/distance');
+            for (let i = 0; i < 5; i++) {
+                client.subscribe(`/efeeder/fed${i}`); // ✅ FIXED HERE
+            }
+            client.subscribe('/efeeder/log');
+            $('#errorMessage').text('');
+        });
+
+        client.on('message', function(topic, message) {
+            const payload = message.toString();
+            if (topic === '/efeeder/time') {
+                latestData.time = payload;
+                $('#timeValue').text(latestData.time);
+            } else if (topic === '/efeeder/servo') {
+                latestData.servo = payload;
+                $('#servoValue').text(latestData.servo);
+            } else if (topic === '/efeeder/relay') {
+                latestData.relay = payload;
+                $('#relayValue').text(latestData.relay);
+            } else if (topic === '/efeeder/distance') {
+    const distanceVal = parseFloat(payload);
+    latestData.distance = distanceVal.toFixed(2);
+    $('#distanceValue').text(latestData.distance);
+
+    if (distanceVal > 40) {
+        $('#distanceValue').addClass('warning');
+        $('#stockText').text('Habis').addClass('warning');
+    } else {
+        $('#distanceValue').removeClass('warning');
+        $('#stockText').text('Tersedia').removeClass('warning');
+    }
+}
+ else if (topic.startsWith('/efeeder/fed')) {
+                const index = topic.split('/').pop();
+                latestData.fed[index] = payload === 'true';
+                $('#fed' + index + 'Value').text(payload === 'true' ? 'Sudah diberikan' : 'Belum diberikan');
+            } else if (topic === '/efeeder/log') {
+                latestData.log = payload;
+                $('#logValue').html(payload.replace(/\n/g, '<br>'));
+            }
+        });
+
+        client.on('error', function(error) {
+            console.error('Kesalahan MQTT:', error);
+            $('#errorMessage').text('Gagal terhubung ke MQTT: ' + error.message);
+        });
+
+        $('#feedButton').click(function() {
+            client.publish('/efeeder/command', '/berikan_pakan_ikan', (err) => {
+                if (err) {
+                    alert('Gagal mengirim perintah pakan!');
+                } else {
+                    alert('Perintah pakan dikirim!');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
